@@ -12,26 +12,25 @@ Write-Host "Steam Downgrader 32-bit - por https://discord.gg/greenstore" -Foregr
 Write-Host "===============================================================" -ForegroundColor DarkYellow
 Write-Host ""
 
-# Garantir que o diretório TEMP exista
+# ===============================================================
+# GARANTIR DIRETÓRIO TEMP
+# ===============================================================
+
 if (-not $env:TEMP -or -not (Test-Path $env:TEMP)) {
     if ($env:LOCALAPPDATA -and (Test-Path $env:LOCALAPPDATA)) {
         $env:TEMP = Join-Path $env:LOCALAPPDATA "Temp"
-    }
-    if (-not $env:TEMP -or -not (Test-Path $env:TEMP)) {
-        if ($PSScriptRoot) {
-            $env:TEMP = Join-Path $PSScriptRoot "temp"
-        } else {
-            $env:TEMP = Join-Path (Get-Location).Path "temp"
-        }
+    } else {
+        $env:TEMP = Join-Path (Get-Location).Path "temp"
     }
 }
+
 if (-not (Test-Path $env:TEMP)) {
     New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
 }
 
-# =========================
+# ===============================================================
 # FUNÇÕES
-# =========================
+# ===============================================================
 
 function Stop-OnError {
     param(
@@ -105,8 +104,6 @@ function Download-AndExtractWithFallback {
 }
 
 function Get-SteamPath {
-    $steamPath = $null
-
     Write-Host "Procurando instalação do Steam..." -ForegroundColor Gray
 
     $regPaths = @(
@@ -118,6 +115,7 @@ function Get-SteamPath {
     foreach ($path in $regPaths) {
         if (Test-Path $path) {
             $prop = Get-ItemProperty -Path $path -ErrorAction SilentlyContinue
+            $steamPath = $null
 
             if ($prop.SteamPath) {
                 $steamPath = $prop.SteamPath
@@ -134,24 +132,21 @@ function Get-SteamPath {
     return $null
 }
 
-# =========================
+# ===============================================================
 # EXECUÇÃO
-# =========================
+# ===============================================================
 
 Write-Host "Etapa 0: Localizando instalação do Steam..." -ForegroundColor Yellow
 $steamPath = Get-SteamPath
 
 if (-not $steamPath) {
-    Write-Host "Steam installation not found in registry." -ForegroundColor Red
-    Write-Host "Please ensure Steam is installed on your system." -ForegroundColor Yellow
-    exit
+    Stop-OnError "Steam installation not found in registry." "" "Detect Steam"
 }
 
 $steamExePath = Join-Path $steamPath "Steam.exe"
 
 if (-not (Test-Path $steamExePath)) {
-    Write-Host "Steam.exe not found at: $steamExePath" -ForegroundColor Red
-    exit
+    Stop-OnError "Steam.exe não encontrado." $steamExePath "Detect Steam"
 }
 
 Write-Host "Steam encontrado com sucesso!" -ForegroundColor Green
