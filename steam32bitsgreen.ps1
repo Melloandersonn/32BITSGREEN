@@ -3,54 +3,24 @@
 Clear-Host
 
 # ===============================================================
-# SIDEBAR CONFIG
+# CONFIG PROGRESS BAR
 # ===============================================================
 
-$global:Steps = @(
-    "Detectando Steam",
-    "Encerrando Steam",
-    "Baixando Steam 32-bit",
-    "Extraindo arquivos",
-    "Criando steam.cfg",
-    "Iniciando Steam"
-)
-
+$global:TotalSteps = 6
 $global:CurrentStep = 0
-$global:TotalSteps = $Steps.Count
 
-function Draw-Sidebar {
-    param ([int]$ActiveStep)
+function Show-Progress {
+    param (
+        [string]$Message
+    )
 
-    Clear-Host
-    Write-Host "┌────────────────────────────┐" -ForegroundColor DarkGreen
-    Write-Host "│   GREEN STORE - PROGRESS   │" -ForegroundColor Green
-    Write-Host "├────────────────────────────┤" -ForegroundColor DarkGreen
-
-    for ($i = 0; $i -lt $Steps.Count; $i++) {
-        if ($i -lt $ActiveStep) {
-            Write-Host ("│ [✔]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor Green
-        }
-        elseif ($i -eq $ActiveStep) {
-            Write-Host ("│ [▶]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor Yellow
-        }
-        else {
-            Write-Host ("│ [·]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor DarkGray
-        }
-    }
-
-    Write-Host "├────────────────────────────┤" -ForegroundColor DarkGreen
-    $percent = [int](($ActiveStep / $TotalSteps) * 100)
-    Write-Host ("│ Progresso: {0}%".PadRight(28) -f $percent) "│" -ForegroundColor Cyan
-    Write-Host "└────────────────────────────┘" -ForegroundColor DarkGreen
-    Write-Host ""
-}
-
-function Next-Step {
     $global:CurrentStep++
-    Draw-Sidebar -ActiveStep $global:CurrentStep
+    $percent = [int](($global:CurrentStep / $global:TotalSteps) * 100)
+    Write-Progress `
+        -Activity "GREEN STORE – Steam 32-bit" `
+        -Status "$Message ($percent%)" `
+        -PercentComplete $percent
 }
-
-Draw-Sidebar -ActiveStep 0
 
 # ===============================================================
 # FUNÇÕES
@@ -58,9 +28,9 @@ Draw-Sidebar -ActiveStep 0
 
 function Stop-OnError {
     param ([string]$Message)
+    Write-Progress -Activity "GREEN STORE – Steam 32-bit" -Completed
     Write-Host ""
     Write-Host "ERRO: $Message" -ForegroundColor Red
-    Write-Host "Script interrompido." -ForegroundColor Red
     exit 1
 }
 
@@ -105,41 +75,32 @@ function Download-Zip {
 # EXECUÇÃO
 # ===============================================================
 
-# STEP 1 – DETECT STEAM
+Show-Progress "Detectando instalação do Steam"
 $steamPath = Get-SteamPath
 if (-not $steamPath) { Stop-OnError "Steam não encontrado." }
-Next-Step
-Start-Sleep 1
 
-# STEP 2 – STOP STEAM
+Show-Progress "Encerrando processos do Steam"
 Stop-SteamProcesses
-Next-Step
 Start-Sleep 1
 
-# STEP 3 – DOWNLOAD
+Show-Progress "Baixando Steam 32-bit"
 $tempZip = Join-Path $env:TEMP "steam32.zip"
 Download-Zip `
     "https://github.com/madoiscool/lt_api_links/releases/download/unsteam/latest32bitsteam.zip" `
     "http://files.luatools.work/OneOffFiles/latest32bitsteam.zip" `
     $tempZip
-Next-Step
-Start-Sleep 1
 
-# STEP 4 – EXTRACT
+Show-Progress "Extraindo arquivos"
 Expand-Archive -Path $tempZip -DestinationPath $steamPath -Force
 Remove-Item $tempZip -Force
-Next-Step
-Start-Sleep 1
 
-# STEP 5 – CFG
+Show-Progress "Criando steam.cfg"
 $cfg = "BootStrapperInhibitAll=enable`nBootStrapperForceSelfUpdate=disable"
 Set-Content -Path (Join-Path $steamPath "steam.cfg") -Value $cfg -Force
-Next-Step
-Start-Sleep 1
 
-# STEP 6 – START STEAM
+Show-Progress "Iniciando Steam"
 Start-Process -FilePath (Join-Path $steamPath "Steam.exe") -ArgumentList "-clearbeta"
-Next-Step
 
+Write-Progress -Activity "GREEN STORE – Steam 32-bit" -Completed
 Write-Host ""
 Write-Host "✔ Processo concluído com sucesso!" -ForegroundColor Green
