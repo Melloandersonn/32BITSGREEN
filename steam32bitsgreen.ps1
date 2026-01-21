@@ -76,41 +76,168 @@ function Stop-SteamProcesses {
     }
 }
 
-function Download-AndExtractWithFallback {
-    param (
-        [string]$PrimaryUrl,
-        [string]$FallbackUrl,
-        [string]$TempZipPath,
-        [string]$DestinationPath,
-        [string]$Description
+function Show-LineProgress {
+    param(
+        [Parameter(Mandatory)] [string]$Label,
+        [Parameter(Mandatory)] [int]$Percent
+    )
+    $barSize = 30
+    $p = [Math]::Max(0, [Math]::Min(100, $Percent))
+    $filled = [int](($p / 100) * $barSize)
+    $bar = ("#" * $filled).PadRight($barSize, ".")
+    Write-Host ("`r{0}: [{1}] {2}%   " -f $Label, $bar, $p) -NoNewline -ForegroundColor Cyan
+}
+
+function Download-FileWithPercent {
+    param(
+        [Parameter(Mandatory)] [string]$Url,
+        [Parameter(Mandatory)] [string]$OutFile,
+        [string]$Label = "Baixando"
     )
 
-    Write-Host "Baixando: $Description" -ForegroundColor Gray
+    $done = $false
+    $wc = New-Object System.Net.WebClient
 
-    $oldProgress = $global:ProgressPreference
+    $wc.DownloadProgressChanged += {
+        Show-LineProgress -Label $Label -Percent $_.ProgressPercentage
+    }
+    $wc.DownloadFileCompleted += { $script:done = $true }
+
     try {
-        $global:ProgressPreference = 'SilentlyContinue'
-
-        try {
-            Invoke-WebRequest -Uri $PrimaryUrl -OutFile $TempZipPath -UseBasicParsing -ErrorAction Stop
-        } catch {
-            Write-Host "Falha no link principal. Tentando fallback..." -ForegroundColor Yellow
-            Invoke-WebRequest -Uri $FallbackUrl -OutFile $TempZipPath -UseBasicParsing -ErrorAction Stop
+        $outDir = Split-Path $OutFile -Parent
+        if ($outDir -and -not (Test-Path $outDir)) {
+            New-Item -ItemType Directory -Path $outDir -Force | Out-Null
         }
 
-        try {
-            Expand-Archive -Path $TempZipPath -DestinationPath $DestinationPath -Force
-            Remove-Item $TempZipPath -Force -ErrorAction SilentlyContinue
-        } catch {
-            Stop-OnError "Falha ao extrair arquivos." $_.Exception.Message "Extract"
-        }
+        $wc.DownloadFileAsync([Uri]$Url, $OutFile)
+        while (-not $done) { Start-Sleep -Milliseconds 80 }
 
-    } catch {
-        Stop-OnError "Falha ao baixar arquivo." $_.Exception.Message "Download"
-    } finally {
-        $global:ProgressPreference = $oldProgress
+        Show-LineProgress -Label $Label -Percent 100
+        Write-Host ""
+    }
+    finally {
+        $wc.Dispose()
     }
 }
+
+function Expand-ArchiveWithPercent {
+    param(
+        [Parameter(Mandatory)] [string]$ZipPath,
+        [Parameter(Mandatory)] [string]$DestinationPath,
+        [string]$Label = "Extraindo"
+    )
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
+
+    try {
+        $files = $zip.Entries | Where-Object { -not ($_.FullName.EndsWith('/') -or $_.FullName.EndsWith('\')) }
+        $total = [Math]::Max(1, $files.Count)
+        $i = 0
+
+        foreach ($e in $zip.Entries) {
+            if ($e.FullName.EndsWith('/') -or $e.FullName.EndsWith('\')) { continue }
+
+            $target = Join-Path $DestinationPath ($e.FullName -replace '/', '\')
+            $dir = Split-Path $target -Parent
+            if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($e, $target, $true)
+
+            $i++
+            $p = [int](($i / $total) * 100)
+            Show-LineProgress -Label $Label -Percent $p
+        }
+
+        Show-LineProgress -Label $Label -Percent 100
+        Write-Host ""
+    }
+    finally {
+        $zip.Dispose()
+    }
+}
+
+function Show-LineProgress {
+    param(
+        [Parameter(Mandatory)] [string]$Label,
+        [Parameter(Mandatory)] [int]$Percent
+    )
+    $barSize = 30
+    $p = [Math]::Max(0, [Math]::Min(100, $Percent))
+    $filled = [int](($p / 100) * $barSize)
+    $bar = ("#" * $filled).PadRight($barSize, ".")
+    Write-Host ("`r{0}: [{1}] {2}%   " -f $Label, $bar, $p) -NoNewline -ForegroundColor Cyan
+}
+
+function Download-FileWithPercent {
+    param(
+        [Parameter(Mandatory)] [string]$Url,
+        [Parameter(Mandatory)] [string]$OutFile,
+        [string]$Label = "Baixando"
+    )
+
+    $done = $false
+    $wc = New-Object System.Net.WebClient
+
+    $wc.DownloadProgressChanged += {
+        Show-LineProgress -Label $Label -Percent $_.ProgressPercentage
+    }
+    $wc.DownloadFileCompleted += { $script:done = $true }
+
+    try {
+        $outDir = Split-Path $OutFile -Parent
+        if ($outDir -and -not (Test-Path $outDir)) {
+            New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+        }
+
+        $wc.DownloadFileAsync([Uri]$Url, $OutFile)
+        while (-not $done) { Start-Sleep -Milliseconds 80 }
+
+        Show-LineProgress -Label $Label -Percent 100
+        Write-Host ""
+    }
+    finally {
+        $wc.Dispose()
+    }
+}
+
+function Expand-ArchiveWithPercent {
+    param(
+        [Parameter(Mandatory)] [string]$ZipPath,
+        [Parameter(Mandatory)] [string]$DestinationPath,
+        [string]$Label = "Extraindo"
+    )
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
+
+    try {
+        $files = $zip.Entries | Where-Object { -not ($_.FullName.EndsWith('/') -or $_.FullName.EndsWith('\')) }
+        $total = [Math]::Max(1, $files.Count)
+        $i = 0
+
+        foreach ($e in $zip.Entries) {
+            if ($e.FullName.EndsWith('/') -or $e.FullName.EndsWith('\')) { continue }
+
+            $target = Join-Path $DestinationPath ($e.FullName -replace '/', '\')
+            $dir = Split-Path $target -Parent
+            if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($e, $target, $true)
+
+            $i++
+            $p = [int](($i / $total) * 100)
+            Show-LineProgress -Label $Label -Percent $p
+        }
+
+        Show-LineProgress -Label $Label -Percent 100
+        Write-Host ""
+    }
+    finally {
+        $zip.Dispose()
+    }
+}
+
 
 function Get-SteamPath {
     $steamPath = $null
