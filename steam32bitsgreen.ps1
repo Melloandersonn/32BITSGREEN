@@ -1,4 +1,6 @@
 #Requires -Version 5.1
+$global:ProgressPreference = 'SilentlyContinue'  # remove a barra azul do Invoke-WebRequest/Expand-Archive
+$ErrorActionPreference = 'Stop'
 # Downgrader Steam 32-bit
 # Obtém o caminho do Steam pelo registro e executa com parâmetros específicos
 
@@ -85,22 +87,28 @@ function Download-AndExtractWithFallback {
 
     Write-Host "Baixando: $Description" -ForegroundColor Gray
 
+    $oldProgress = $global:ProgressPreference
     try {
-        Invoke-WebRequest -Uri $PrimaryUrl -OutFile $TempZipPath -UseBasicParsing
-    } catch {
-        Write-Host "Falha no link principal. Tentando fallback..." -ForegroundColor Yellow
-        try {
-            Invoke-WebRequest -Uri $FallbackUrl -OutFile $TempZipPath -UseBasicParsing
-        } catch {
-            Stop-OnError "Falha ao baixar arquivo." $_.Exception.Message "Download"
-        }
-    }
+        $global:ProgressPreference = 'SilentlyContinue'
 
-    try {
-        Expand-Archive -Path $TempZipPath -DestinationPath $DestinationPath -Force
-        Remove-Item $TempZipPath -Force
+        try {
+            Invoke-WebRequest -Uri $PrimaryUrl -OutFile $TempZipPath -UseBasicParsing -ErrorAction Stop
+        } catch {
+            Write-Host "Falha no link principal. Tentando fallback..." -ForegroundColor Yellow
+            Invoke-WebRequest -Uri $FallbackUrl -OutFile $TempZipPath -UseBasicParsing -ErrorAction Stop
+        }
+
+        try {
+            Expand-Archive -Path $TempZipPath -DestinationPath $DestinationPath -Force
+            Remove-Item $TempZipPath -Force -ErrorAction SilentlyContinue
+        } catch {
+            Stop-OnError "Falha ao extrair arquivos." $_.Exception.Message "Extract"
+        }
+
     } catch {
-        Stop-OnError "Falha ao extrair arquivos." $_.Exception.Message "Extract"
+        Stop-OnError "Falha ao baixar arquivo." $_.Exception.Message "Download"
+    } finally {
+        $global:ProgressPreference = $oldProgress
     }
 }
 
