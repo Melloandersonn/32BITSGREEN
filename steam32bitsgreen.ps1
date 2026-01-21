@@ -1,6 +1,6 @@
 #Requires -Version 5.1
 # Steam 32-bit Downgrader with Christmas Theme
-# Obtém o caminho do Steam pelo registro e executa com parâmetros especificados
+# Gets Steam path from registry and runs with specified parameters
 
 # Limpar tela
 Clear-Host
@@ -8,7 +8,7 @@ Clear-Host
 # Cabeçalho com tema de Natal
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor DarkYellow
-Write-Host "Steam 32-bit Downgrader - por discord.gg/greenstore" -ForegroundColor Cyan
+Write-Host "Steam 32-bit Downgrader - by discord.gg/luatools (join for fun)" -ForegroundColor Cyan
 Write-Host "===============================================================" -ForegroundColor DarkYellow
 Write-Host ""
 
@@ -43,23 +43,23 @@ function Stop-OnError {
     
     Write-Host ""
     Write-Host "===============================================================" -ForegroundColor Red
-    Write-Host "OCORREU UM ERRO" -ForegroundColor Red
+    Write-Host "ERROR OCCURRED" -ForegroundColor Red
     if ($StepName) {
-        Write-Host "Passo: $StepName" -ForegroundColor Yellow
+        Write-Host "Step: $StepName" -ForegroundColor Yellow
     }
     Write-Host "===============================================================" -ForegroundColor Red
     Write-Host ""
-    Write-Host "Mensagem de erro: $ErrorMessage" -ForegroundColor Red
+    Write-Host "Error Message: $ErrorMessage" -ForegroundColor Red
     if ($ErrorDetails) {
         Write-Host ""
-        Write-Host "Detalhes: $ErrorDetails" -ForegroundColor Yellow
+        Write-Host "Details: $ErrorDetails" -ForegroundColor Yellow
     }
     Write-Host ""
-    Write-Host "O script não pode continuar devido a este erro." -ForegroundColor Yellow
-    Write-Host "Por favor, resolva o problema e tente novamente." -ForegroundColor Yellow
+    Write-Host "The script cannot continue due to this error." -ForegroundColor Yellow
+    Write-Host "Please resolve the issue and try again." -ForegroundColor Yellow
     Write-Host ""
     Write-Host "===============================================================" -ForegroundColor Red
-    Write-Host "Saindo..." -ForegroundColor Red
+    Write-Host "Exiting..." -ForegroundColor Red
     Write-Host "===============================================================" -ForegroundColor Red
     exit 1
 }
@@ -68,7 +68,7 @@ function Stop-OnError {
 function Get-SteamPath {
     $steamPath = $null
     
-    Write-Host "Procurando pela instalação do Steam..." -ForegroundColor Gray
+    Write-Host "Searching for Steam installation..." -ForegroundColor Gray
     
     # Tentar HKCU primeiro (registro do usuário)
     $regPath = "HKCU:\Software\Valve\Steam"
@@ -130,27 +130,27 @@ function Download-FileWithProgress {
         try {
             $response = $request.GetResponse()
         } catch {
-            Write-Host "  [ERRO] Conexão falhou: $_" -ForegroundColor Red
-            Write-Host "  [ERRO] URL: $cacheBustUrl" -ForegroundColor Red
-            throw "Tempo de conexão ou falha ao conectar ao servidor"
+            Write-Host "  [ERROR] Connection failed: $_" -ForegroundColor Red
+            Write-Host "  [ERROR] URL: $cacheBustUrl" -ForegroundColor Red
+            throw "Connection timeout or failed to connect to server"
         }
         
         # Verificar código de resposta
         $statusCode = [int]$response.StatusCode
         if ($statusCode -ne 200) {
             $response.Close()
-            Write-Host "  [ERRO] Código de resposta inválido: $statusCode (esperado 200)" -ForegroundColor Red
-            Write-Host "  [ERRO] URL: $cacheBustUrl" -ForegroundColor Red
-            throw "Servidor retornou o código de status $statusCode em vez de 200"
+            Write-Host "  [ERROR] Invalid response code: $statusCode (expected 200)" -ForegroundColor Red
+            Write-Host "  [ERROR] URL: $cacheBustUrl" -ForegroundColor Red
+            throw "Server returned status code $statusCode instead of 200"
         }
         
         # Verificar comprimento do conteúdo
         $totalLength = $response.ContentLength
         if ($totalLength -eq 0) {
             $response.Close()
-            Write-Host "  [ERRO] Comprimento do conteúdo inválido: $totalLength (esperado > 0 ou -1 para desconhecido)" -ForegroundColor Red
-            Write-Host "  [ERRO] URL: $cacheBustUrl" -ForegroundColor Red
-            throw "Servidor retornou comprimento de conteúdo zero"
+            Write-Host "  [ERROR] Invalid content length: $totalLength (expected > 0 or -1 for unknown)" -ForegroundColor Red
+            Write-Host "  [ERROR] URL: $cacheBustUrl" -ForegroundColor Red
+            throw "Server returned zero content length"
         }
         $response.Close()
         
@@ -166,9 +166,9 @@ function Download-FileWithProgress {
         try {
             $response = $request.GetResponse()
         } catch {
-            Write-Host "  [ERRO] Falha na conexão de download: $_" -ForegroundColor Red
-            Write-Host "  [ERRO] URL: $cacheBustUrl" -ForegroundColor Red
-            throw "Falha de conexão durante o download"
+            Write-Host "  [ERROR] Download connection failed: $_" -ForegroundColor Red
+            Write-Host "  [ERROR] URL: $cacheBustUrl" -ForegroundColor Red
+            throw "Download connection failed"
         }
         
         try {
@@ -207,9 +207,9 @@ function Download-FileWithProgress {
                     $timeSinceLastBytes = ($now - $lastBytesUpdateTime).TotalSeconds
                     if ($timeSinceLastBytes -ge $stuckTimeoutSeconds) {
                         Write-Host ""
-                        Write-Host "  [ERRO] Download travado (0 kbps por $stuckTimeoutSeconds segundos)" -ForegroundColor Red
-                        Write-Host "  [ERRO] Baixado: $downloadedBytes bytes, Esperado: $totalLength bytes" -ForegroundColor Red
-                        throw "Download travado - sem dados recebidos por $stuckTimeoutSeconds segundos"
+                        Write-Host "  [ERROR] Download is stuck (0 kbps for $stuckTimeoutSeconds seconds)" -ForegroundColor Red
+                        Write-Host "  [ERROR] Downloaded: $downloadedBytes bytes, Expected: $totalLength bytes" -ForegroundColor Red
+                        throw "Download is stuck - no data received for $stuckTimeoutSeconds seconds"
                     }
                 }
                 
@@ -217,15 +217,15 @@ function Download-FileWithProgress {
                 if (($now - $lastUpdate).TotalMilliseconds -ge 100) {
                     if ($totalLength -gt 0) {
                         $percentComplete = [math]::Round(($downloadedBytes / $totalLength) * 100, 2)
-                        Write-Host "`r  Progresso: $percentComplete% ($downloadedBytes bytes de $totalLength bytes)" -NoNewline -ForegroundColor Cyan
+                        Write-Host "`r  Progress: $percentComplete% ($downloadedBytes bytes of $totalLength bytes)" -NoNewline -ForegroundColor Cyan
                     } else {
-                        Write-Host "`r  Progresso: Baixando $downloadedBytes bytes..." -NoNewline -ForegroundColor Cyan
+                        Write-Host "`r  Progress: Downloading $downloadedBytes bytes..." -NoNewline -ForegroundColor Cyan
                     }
                     $lastUpdate = $now
                 }
             }
             
-            Write-Host "`r  Progresso: 100% Completo!" -ForegroundColor Green
+            Write-Host "`r  Progress: 100% Complete!" -ForegroundColor Green
             Write-Host ""
             return $true
         } finally {
@@ -242,10 +242,9 @@ function Download-FileWithProgress {
         }
     } catch {
         Write-Host ""
-        Write-Host "  [ERRO] Falha no download: $_" -ForegroundColor Red
-        Write-Host "  [ERRO] Detalhes do erro: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "  [ERROR] Download failed: $_" -ForegroundColor Red
+        Write-Host "  [ERROR] Error details: $($_.Exception.Message)" -ForegroundColor Red
         Write-Host ""
         throw $_
     }
 }
-
