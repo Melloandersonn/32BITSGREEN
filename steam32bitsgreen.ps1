@@ -218,6 +218,15 @@ Write-Host '──────░█░░░░░░░░█░░░█░' 
 Write-Host '──────░█░░░░░░░░░░░░█░' -ForegroundColor Green
 Write-Host '──────░█░░░░░░░░░░░░░█░' -ForegroundColor Green
 Write-Host '──────░█░░░░░░░░░░░░█░' -ForegroundColor Green
+Write-Host '████──░█░████░░░░░░░░█░' -ForegroundColor Green
+Write-Host '█──█──████──████░░░░░█░' -ForegroundColor Green
+Write-Host '█──█──█──█──█──████████' -ForegroundColor Green
+Write-Host '█──█──████──█──█──────█' -ForegroundColor Green
+Write-Host '█──█──█──█────██──██──█' -ForegroundColor Green
+Write-Host '█──████──█──█──█──────█' -ForegroundColor Green
+Write-Host '█─────█──█──█──█──█████' -ForegroundColor Green
+Write-Host '███████──████──█──────█' -ForegroundColor Green
+Write-Host '──────████──██████████' -ForegroundColor Green
 
 # ===============================================================
 # AVISO DE SUCESSO
@@ -228,4 +237,23 @@ Write-Host "=====================================================" -ForegroundCo
 Write-Host "              Steam foi voltada para 32 bits! 🎉              " -ForegroundColor Green
 Write-Host "=====================================================" -ForegroundColor Green
 Write-Host "        Parabéns, a Steam foi revertida para a versão de 32 bits com sucesso!" -ForegroundColor Green
+Write-Host ""
+
+# ===============================================================
+# MELHORANDO A EXIBIÇÃO DO CARREGAMENTO DA EXPANSÃO DO ARQUIVO
+# ===============================================================
+
+Write-Host "Expansão do arquivo está em andamento..." -ForegroundColor Yellow
+$progress = 0
+$progressBar = "████████████████████████████████████████████████████████"
+while ($progress -lt 100) {
+    $progress++
+    $currentProgress = $progressBar.Substring(0, $progress)
+    Write-Host -NoNewline "$currentProgress" -ForegroundColor Green
+    Start-Sleep -Milliseconds 50
+    Write-Host -NoNewline "`r"
+}
+Write-Host "`n"
+
+Write-Host "A expansão do arquivo foi concluída com sucesso!" -ForegroundColor Green
 Write-Host ""
