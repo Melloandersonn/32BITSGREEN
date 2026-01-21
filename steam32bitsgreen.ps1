@@ -8,7 +8,7 @@ Clear-Host
 # Cabeçalho com tema de Natal
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor DarkYellow
-Write-Host "Steam 32-bit Downgrader - por discord.gg/luatools (entre para se divertir)" -ForegroundColor Cyan
+Write-Host "Steam 32-bit Downgrader - por discord.gg/greenstore" -ForegroundColor Cyan
 Write-Host "===============================================================" -ForegroundColor DarkYellow
 Write-Host ""
 
