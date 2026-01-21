@@ -8,7 +8,7 @@ Clear-Host
 # Christmas-themed header
 Write-Host ""
 Write-Host "===============================================================" -ForegroundColor DarkYellow
-Write-Host "Steam 32-bit Downgrader - by discord.gg/luatools (join for fun)" -ForegroundColor Cyan
+Write-Host "Steam 32-bit Downgrader =" -ForegroundColor Cyan
 Write-Host "===============================================================" -ForegroundColor DarkYellow
 Write-Host ""
 
