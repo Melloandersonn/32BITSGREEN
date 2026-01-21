@@ -3,7 +3,7 @@
 Clear-Host
 
 # ===============================================================
-# CONFIG SIDEBAR
+# SIDEBAR CONFIG
 # ===============================================================
 
 $global:Steps = @(
@@ -19,9 +19,7 @@ $global:CurrentStep = 0
 $global:TotalSteps = $Steps.Count
 
 function Draw-Sidebar {
-    param (
-        [int]$ActiveStep
-    )
+    param ([int]$ActiveStep)
 
     Clear-Host
     Write-Host "┌────────────────────────────┐" -ForegroundColor DarkGreen
@@ -30,18 +28,17 @@ function Draw-Sidebar {
 
     for ($i = 0; $i -lt $Steps.Count; $i++) {
         if ($i -lt $ActiveStep) {
-            Write-Host ("│ [OK]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor Green
+            Write-Host ("│ [✔]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor Green
         }
         elseif ($i -eq $ActiveStep) {
-            Write-Host ("│ [>>]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor Yellow
+            Write-Host ("│ [▶]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor Yellow
         }
         else {
-            Write-Host ("│ [..]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor DarkGray
+            Write-Host ("│ [·]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor DarkGray
         }
     }
 
     Write-Host "├────────────────────────────┤" -ForegroundColor DarkGreen
-
     $percent = [int](($ActiveStep / $TotalSteps) * 100)
     Write-Host ("│ Progresso: {0}%".PadRight(28) -f $percent) "│" -ForegroundColor Cyan
     Write-Host "└────────────────────────────┘" -ForegroundColor DarkGreen
@@ -61,10 +58,9 @@ Draw-Sidebar -ActiveStep 0
 
 function Stop-OnError {
     param ([string]$Message)
-
     Write-Host ""
     Write-Host "ERRO: $Message" -ForegroundColor Red
-    Write-Host "O script foi interrompido." -ForegroundColor Red
+    Write-Host "Script interrompido." -ForegroundColor Red
     exit 1
 }
 
@@ -83,7 +79,7 @@ function Get-SteamPath {
 
     foreach ($p in $paths) {
         if (Test-Path $p) {
-            $prop = Get-ItemProperty $p
+            $prop = Get-ItemProperty -Path $p -ErrorAction SilentlyContinue
             if ($prop.SteamPath -and (Test-Path $prop.SteamPath)) {
                 return $prop.SteamPath
             }
@@ -99,9 +95,9 @@ function Download-Zip {
     param ($Url, $Fallback, $Out)
 
     try {
-        Invoke-WebRequest $Url -OutFile $Out -UseBasicParsing
+        Invoke-WebRequest -Uri $Url -OutFile $Out -UseBasicParsing
     } catch {
-        Invoke-WebRequest $Fallback -OutFile $Out -UseBasicParsing
+        Invoke-WebRequest -Uri $Fallback -OutFile $Out -UseBasicParsing
     }
 }
 
@@ -109,36 +105,40 @@ function Download-Zip {
 # EXECUÇÃO
 # ===============================================================
 
-# STEP 1 - DETECT STEAM
+# STEP 1 – DETECT STEAM
 $steamPath = Get-SteamPath
 if (-not $steamPath) { Stop-OnError "Steam não encontrado." }
 Next-Step
-
-# STEP 2 - STOP STEAM
-Stop-SteamProcesses
 Start-Sleep 1
-Next-Step
 
-# STEP 3 - DOWNLOAD
+# STEP 2 – STOP STEAM
+Stop-SteamProcesses
+Next-Step
+Start-Sleep 1
+
+# STEP 3 – DOWNLOAD
 $tempZip = Join-Path $env:TEMP "steam32.zip"
 Download-Zip `
     "https://github.com/madoiscool/lt_api_links/releases/download/unsteam/latest32bitsteam.zip" `
     "http://files.luatools.work/OneOffFiles/latest32bitsteam.zip" `
     $tempZip
 Next-Step
+Start-Sleep 1
 
-# STEP 4 - EXTRACT
-Expand-Archive $tempZip -DestinationPath $steamPath -Force
+# STEP 4 – EXTRACT
+Expand-Archive -Path $tempZip -DestinationPath $steamPath -Force
 Remove-Item $tempZip -Force
 Next-Step
+Start-Sleep 1
 
-# STEP 5 - CFG
+# STEP 5 – CFG
 $cfg = "BootStrapperInhibitAll=enable`nBootStrapperForceSelfUpdate=disable"
-Set-Content (Join-Path $steamPath "steam.cfg") $cfg -Force
+Set-Content -Path (Join-Path $steamPath "steam.cfg") -Value $cfg -Force
 Next-Step
+Start-Sleep 1
 
-# STEP 6 - START STEAM
-Start-Process (Join-Path $steamPath "Steam.exe") "-clearbeta"
+# STEP 6 – START STEAM
+Start-Process -FilePath (Join-Path $steamPath "Steam.exe") -ArgumentList "-clearbeta"
 Next-Step
 
 Write-Host ""
