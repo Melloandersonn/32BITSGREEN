@@ -1,184 +1,145 @@
 #Requires -Version 5.1
-# Downgrader Steam 32-bit
-# Obtém o caminho do Steam pelo registro e executa com parâmetros específicos
-
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
 Clear-Host
 
-Write-Host ""
-Write-Host "===============================================================" -ForegroundColor DarkYellow
-Write-Host "Steam Downgrader 32-bit - por https://discord.gg/greenstore" -ForegroundColor Cyan
-Write-Host "===============================================================" -ForegroundColor DarkYellow
-Write-Host ""
-
 # ===============================================================
-# GARANTIR DIRETÓRIO TEMP
+# CONFIG SIDEBAR
 # ===============================================================
 
-if (-not $env:TEMP -or -not (Test-Path $env:TEMP)) {
-    if ($env:LOCALAPPDATA -and (Test-Path $env:LOCALAPPDATA)) {
-        $env:TEMP = Join-Path $env:LOCALAPPDATA "Temp"
-    } else {
-        $env:TEMP = Join-Path (Get-Location).Path "temp"
+$global:Steps = @(
+    "Detectando Steam",
+    "Encerrando Steam",
+    "Baixando Steam 32-bit",
+    "Extraindo arquivos",
+    "Criando steam.cfg",
+    "Iniciando Steam"
+)
+
+$global:CurrentStep = 0
+$global:TotalSteps = $Steps.Count
+
+function Draw-Sidebar {
+    param (
+        [int]$ActiveStep
+    )
+
+    Clear-Host
+    Write-Host "┌────────────────────────────┐" -ForegroundColor DarkGreen
+    Write-Host "│   GREEN STORE - PROGRESS   │" -ForegroundColor Green
+    Write-Host "├────────────────────────────┤" -ForegroundColor DarkGreen
+
+    for ($i = 0; $i -lt $Steps.Count; $i++) {
+        if ($i -lt $ActiveStep) {
+            Write-Host ("│ [OK]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor Green
+        }
+        elseif ($i -eq $ActiveStep) {
+            Write-Host ("│ [>>]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor Yellow
+        }
+        else {
+            Write-Host ("│ [..]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor DarkGray
+        }
     }
+
+    Write-Host "├────────────────────────────┤" -ForegroundColor DarkGreen
+
+    $percent = [int](($ActiveStep / $TotalSteps) * 100)
+    Write-Host ("│ Progresso: {0}%".PadRight(28) -f $percent) "│" -ForegroundColor Cyan
+    Write-Host "└────────────────────────────┘" -ForegroundColor DarkGreen
+    Write-Host ""
 }
 
-if (-not (Test-Path $env:TEMP)) {
-    New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
+function Next-Step {
+    $global:CurrentStep++
+    Draw-Sidebar -ActiveStep $global:CurrentStep
 }
+
+Draw-Sidebar -ActiveStep 0
 
 # ===============================================================
 # FUNÇÕES
 # ===============================================================
 
 function Stop-OnError {
-    param(
-        [string]$ErrorMessage,
-        [string]$ErrorDetails = "",
-        [string]$StepName = ""
-    )
+    param ([string]$Message)
 
     Write-Host ""
-    Write-Host "===============================================================" -ForegroundColor Red
-    Write-Host "ERROR OCCURRED" -ForegroundColor Red
-    if ($StepName) {
-        Write-Host "Step: $StepName" -ForegroundColor Yellow
-    }
-    Write-Host "===============================================================" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Error Message: $ErrorMessage" -ForegroundColor Red
-    if ($ErrorDetails) {
-        Write-Host ""
-        Write-Host "Details: $ErrorDetails" -ForegroundColor Yellow
-    }
-    Write-Host ""
-    Write-Host "The script cannot continue due to this error." -ForegroundColor Yellow
-    Write-Host "Please resolve the issue and try again." -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "===============================================================" -ForegroundColor Red
-    Write-Host "Exiting..." -ForegroundColor Red
-    Write-Host "===============================================================" -ForegroundColor Red
+    Write-Host "ERRO: $Message" -ForegroundColor Red
+    Write-Host "O script foi interrompido." -ForegroundColor Red
     exit 1
 }
 
 function Stop-SteamProcesses {
-    Write-Host "Encerrando processos do Steam..." -ForegroundColor Gray
     Get-Process steam -ErrorAction SilentlyContinue | ForEach-Object {
-        try {
-            Stop-Process -Id $_.Id -Force
-        } catch {
-            Stop-OnError "Falha ao encerrar processos do Steam." $_.Exception.Message "Stop-SteamProcesses"
-        }
-    }
-}
-
-function Download-AndExtractWithFallback {
-    param (
-        [string]$PrimaryUrl,
-        [string]$FallbackUrl,
-        [string]$TempZipPath,
-        [string]$DestinationPath,
-        [string]$Description
-    )
-
-    Write-Host "Baixando: $Description" -ForegroundColor Gray
-
-    try {
-        Invoke-WebRequest -Uri $PrimaryUrl -OutFile $TempZipPath -UseBasicParsing
-    } catch {
-        Write-Host "Falha no link principal. Tentando fallback..." -ForegroundColor Yellow
-        try {
-            Invoke-WebRequest -Uri $FallbackUrl -OutFile $TempZipPath -UseBasicParsing
-        } catch {
-            Stop-OnError "Falha ao baixar arquivo." $_.Exception.Message "Download"
-        }
-    }
-
-    try {
-        Expand-Archive -Path $TempZipPath -DestinationPath $DestinationPath -Force
-        Remove-Item $TempZipPath -Force
-    } catch {
-        Stop-OnError "Falha ao extrair arquivos." $_.Exception.Message "Extract"
+        Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
     }
 }
 
 function Get-SteamPath {
-    Write-Host "Procurando instalação do Steam..." -ForegroundColor Gray
-
-    $regPaths = @(
+    $paths = @(
         "HKCU:\Software\Valve\Steam",
         "HKLM:\Software\Valve\Steam",
         "HKLM:\Software\WOW6432Node\Valve\Steam"
     )
 
-    foreach ($path in $regPaths) {
-        if (Test-Path $path) {
-            $prop = Get-ItemProperty -Path $path -ErrorAction SilentlyContinue
-            $steamPath = $null
-
-            if ($prop.SteamPath) {
-                $steamPath = $prop.SteamPath
-            } elseif ($prop.InstallPath) {
-                $steamPath = $prop.InstallPath
+    foreach ($p in $paths) {
+        if (Test-Path $p) {
+            $prop = Get-ItemProperty $p
+            if ($prop.SteamPath -and (Test-Path $prop.SteamPath)) {
+                return $prop.SteamPath
             }
-
-            if ($steamPath -and (Test-Path $steamPath)) {
-                return $steamPath
+            if ($prop.InstallPath -and (Test-Path $prop.InstallPath)) {
+                return $prop.InstallPath
             }
         }
     }
-
     return $null
+}
+
+function Download-Zip {
+    param ($Url, $Fallback, $Out)
+
+    try {
+        Invoke-WebRequest $Url -OutFile $Out -UseBasicParsing
+    } catch {
+        Invoke-WebRequest $Fallback -OutFile $Out -UseBasicParsing
+    }
 }
 
 # ===============================================================
 # EXECUÇÃO
 # ===============================================================
 
-Write-Host "Etapa 0: Localizando instalação do Steam..." -ForegroundColor Yellow
+# STEP 1 - DETECT STEAM
 $steamPath = Get-SteamPath
+if (-not $steamPath) { Stop-OnError "Steam não encontrado." }
+Next-Step
 
-if (-not $steamPath) {
-    Stop-OnError "Steam installation not found in registry." "" "Detect Steam"
-}
-
-$steamExePath = Join-Path $steamPath "Steam.exe"
-
-if (-not (Test-Path $steamExePath)) {
-    Stop-OnError "Steam.exe não encontrado." $steamExePath "Detect Steam"
-}
-
-Write-Host "Steam encontrado com sucesso!" -ForegroundColor Green
-Write-Host "Local: $steamPath" -ForegroundColor White
-Write-Host ""
-
-Write-Host "Etapa 1: Encerrando processos do Steam..." -ForegroundColor Yellow
+# STEP 2 - STOP STEAM
 Stop-SteamProcesses
+Start-Sleep 1
+Next-Step
+
+# STEP 3 - DOWNLOAD
+$tempZip = Join-Path $env:TEMP "steam32.zip"
+Download-Zip `
+    "https://github.com/madoiscool/lt_api_links/releases/download/unsteam/latest32bitsteam.zip" `
+    "http://files.luatools.work/OneOffFiles/latest32bitsteam.zip" `
+    $tempZip
+Next-Step
+
+# STEP 4 - EXTRACT
+Expand-Archive $tempZip -DestinationPath $steamPath -Force
+Remove-Item $tempZip -Force
+Next-Step
+
+# STEP 5 - CFG
+$cfg = "BootStrapperInhibitAll=enable`nBootStrapperForceSelfUpdate=disable"
+Set-Content (Join-Path $steamPath "steam.cfg") $cfg -Force
+Next-Step
+
+# STEP 6 - START STEAM
+Start-Process (Join-Path $steamPath "Steam.exe") "-clearbeta"
+Next-Step
+
 Write-Host ""
-
-Write-Host "Etapa 2: Baixando e extraindo Steam 32-bit..." -ForegroundColor Yellow
-$steamZipUrl = "https://github.com/madoiscool/lt_api_links/releases/download/unsteam/latest32bitsteam.zip"
-$steamZipFallbackUrl = "http://files.luatools.work/OneOffFiles/latest32bitsteam.zip"
-$tempSteamZip = Join-Path $env:TEMP "latest32bitsteam.zip"
-
-Download-AndExtractWithFallback `
-    -PrimaryUrl $steamZipUrl `
-    -FallbackUrl $steamZipFallbackUrl `
-    -TempZipPath $tempSteamZip `
-    -DestinationPath $steamPath `
-    -Description "Steam x32 Latest Build"
-
-Write-Host "Etapa 3: Criando steam.cfg..." -ForegroundColor Yellow
-$steamCfgPath = Join-Path $steamPath "steam.cfg"
-$cfgContent = "BootStrapperInhibitAll=enable`nBootStrapperForceSelfUpdate=disable"
-Set-Content -Path $steamCfgPath -Value $cfgContent -Force
-
-Write-Host "steam.cfg criado com sucesso!" -ForegroundColor Green
-Write-Host ""
-
-Write-Host "Etapa 4: Iniciando Steam..." -ForegroundColor Yellow
-Start-Process -FilePath $steamExePath -ArgumentList "-clearbeta" -WindowStyle Normal
-
-Write-Host ""
-Write-Host "Steam iniciado com sucesso." -ForegroundColor Green
+Write-Host "✔ Processo concluído com sucesso!" -ForegroundColor Green
