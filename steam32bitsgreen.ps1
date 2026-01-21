@@ -1,9 +1,19 @@
 #Requires -Version 5.1
 
 # =========================
+# CONSOLE / ENCODING (fix de "conclu??do" e "???")
+# =========================
+try {
+    # UTF-8 sem BOM na saida do console
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [Console]::OutputEncoding = $utf8NoBom
+    $OutputEncoding = $utf8NoBom
+} catch { }
+
+# =========================
 # CLEAN MODE (remove barras azuis internas)
 # =========================
-$global:ProgressPreference = 'SilentlyContinue'   # mata "Gravando solicitação na Web", progress de comandos, etc.
+$global:ProgressPreference = 'SilentlyContinue'
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -14,9 +24,9 @@ Clear-Host
 # =========================
 $script:Steps = @(
     "Etapa 1/5 - Preparando",
-    "Etapa 2/5 - Executando ação A",
-    "Etapa 3/5 - Executando ação B",
-    "Etapa 4/5 - Aplicando configurações",
+    "Etapa 2/5 - Executando",
+    "Etapa 3/5 - Processando",
+    "Etapa 4/5 - Aplicando",
     "Etapa 5/5 - Finalizando"
 )
 $script:StepIndex = 0
@@ -30,28 +40,29 @@ function Set-Step {
 
     $percent = [int](($script:StepIndex / $script:TotalSteps) * 100)
 
-    # Somente sua barra (sem azul automático)
-    Write-Progress -Activity "GREEN STORE – Progresso" -Status "$Message ($percent%)" -PercentComplete $percent
+    # Apenas a SUA barra (nada de azul automatico)
+    Write-Progress -Id 1 -Activity "GREEN STORE - Progresso" -Status "$Message ($percent%)" -PercentComplete $percent
 }
 
 function Stop-OnError {
     param([string]$Message)
 
-    Write-Progress -Activity "GREEN STORE – Progresso" -Completed
+    Write-Progress -Id 1 -Activity "GREEN STORE - Progresso" -Completed
     Write-Host ""
-    Write-Host "ERRO: $Message" -ForegroundColor Red
+    Write-Host "[ERRO] $Message" -ForegroundColor Red
     exit 1
 }
 
 function Done {
-    Write-Progress -Activity "GREEN STORE – Progresso" -Completed
+    Write-Progress -Id 1 -Activity "GREEN STORE - Progresso" -Completed
     Write-Host ""
-    Write-Host "✔ Processo concluído com sucesso!" -ForegroundColor Green
+    # Sem acento e sem emoji (pra nao quebrar em PS 5.1)
+    Write-Host "[OK] Processo concluido com sucesso!" -ForegroundColor Green
 }
 
-# Helper: executa um bloco sem qualquer progress interno
+# Executa um bloco garantindo que nenhum comando desenhe "barra azul"
 function Invoke-Clean {
-    param([scriptblock]$Block)
+    param([Parameter(Mandatory)] [scriptblock]$Block)
 
     $old = $global:ProgressPreference
     try {
@@ -63,37 +74,37 @@ function Invoke-Clean {
 }
 
 # =========================
-# EXECUÇÃO (coloque suas ações aqui)
+# EXECUCAO (coloque suas acoes aqui)
 # =========================
 try {
     Set-Step $script:Steps[0]
     Invoke-Clean {
-        Start-Sleep -Milliseconds 700
-        # >>> COLOQUE AQUI sua lógica da Etapa 1
+        # >>> COLOQUE AQUI a logica da etapa 1
+        Start-Sleep -Milliseconds 400
     }
 
     Set-Step $script:Steps[1]
     Invoke-Clean {
-        Start-Sleep -Milliseconds 900
-        # >>> COLOQUE AQUI sua lógica da Etapa 2
+        # >>> COLOQUE AQUI a logica da etapa 2
+        Start-Sleep -Milliseconds 400
     }
 
     Set-Step $script:Steps[2]
     Invoke-Clean {
-        Start-Sleep -Milliseconds 900
-        # >>> COLOQUE AQUI sua lógica da Etapa 3
+        # >>> COLOQUE AQUI a logica da etapa 3
+        Start-Sleep -Milliseconds 400
     }
 
     Set-Step $script:Steps[3]
     Invoke-Clean {
-        Start-Sleep -Milliseconds 700
-        # >>> COLOQUE AQUI sua lógica da Etapa 4
+        # >>> COLOQUE AQUI a logica da etapa 4
+        Start-Sleep -Milliseconds 400
     }
 
     Set-Step $script:Steps[4]
     Invoke-Clean {
-        Start-Sleep -Milliseconds 500
-        # >>> COLOQUE AQUI sua lógica da Etapa 5
+        # >>> COLOQUE AQUI a logica da etapa 5
+        Start-Sleep -Milliseconds 400
     }
 
     Done
