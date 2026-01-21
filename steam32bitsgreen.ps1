@@ -1,25 +1,18 @@
 #Requires -Version 5.1
 
-# ===== Encoding/Console (corrige "conclu??do" e "???") =====
-try {
-    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
-    [Console]::OutputEncoding = $utf8NoBom
-    $OutputEncoding = $utf8NoBom
-} catch { }
-
-# ===== Clean UI (remove barras azuis do PowerShell) =====
+# --- Clean: remove progress azul interno (Invoke-WebRequest / Expand-Archive etc.)
 $global:ProgressPreference = 'SilentlyContinue'
 $ErrorActionPreference = 'Stop'
-
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 Clear-Host
 
 # ===============================================================
-# CONFIG SIDEBAR
+# CONFIG SIDEBAR (ASCII only - no ???)
 # ===============================================================
 $global:Steps = @(
-    "Detectando Steam",
-    "Encerrando Steam",
+    "Detectando caminho",
+    "Encerrando processos",
     "Baixando arquivo",
     "Extraindo arquivos",
     "Criando configuracao",
@@ -33,24 +26,26 @@ function Draw-Sidebar {
     param([int]$ActiveStep)
 
     Clear-Host
-    Write-Host "┌────────────────────────────┐" -ForegroundColor DarkGreen
-    Write-Host "│   GREEN STORE - PROGRESS   │" -ForegroundColor Green
-    Write-Host "├────────────────────────────┤" -ForegroundColor DarkGreen
+    Write-Host "+----------------------------------+" -ForegroundColor Green
+    Write-Host "|        GREEN STORE - PROGRESS     |" -ForegroundColor Green
+    Write-Host "+----------------------------------+" -ForegroundColor Green
 
     for ($i = 0; $i -lt $Steps.Count; $i++) {
         if ($i -lt $ActiveStep) {
-            Write-Host ("│ [OK]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor Green
-        } elseif ($i -eq $ActiveStep) {
-            Write-Host ("│ [>>]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor Yellow
-        } else {
-            Write-Host ("│ [..]  " + $Steps[$i]).PadRight(28) "│" -ForegroundColor DarkGray
+            Write-Host ("| [OK] " + $Steps[$i]).PadRight(35) + "|" -ForegroundColor Green
+        }
+        elseif ($i -eq $ActiveStep) {
+            Write-Host ("| [>>] " + $Steps[$i]).PadRight(35) + "|" -ForegroundColor Yellow
+        }
+        else {
+            Write-Host ("| [..] " + $Steps[$i]).PadRight(35) + "|" -ForegroundColor DarkGray
         }
     }
 
-    Write-Host "├────────────────────────────┤" -ForegroundColor DarkGreen
+    Write-Host "+----------------------------------+" -ForegroundColor Green
     $percent = [int](($ActiveStep / $TotalSteps) * 100)
-    Write-Host ("│ Progresso: {0}%".PadRight(28) -f $percent) "│" -ForegroundColor Cyan
-    Write-Host "└────────────────────────────┘" -ForegroundColor DarkGreen
+    Write-Host ("| Progresso: {0}%".PadRight(35) -f $percent) + "|" -ForegroundColor Cyan
+    Write-Host "+----------------------------------+" -ForegroundColor Green
     Write-Host ""
 }
 
@@ -66,23 +61,20 @@ Draw-Sidebar -ActiveStep 0
 # ===============================================================
 function Stop-OnError {
     param([string]$Message)
-
     Write-Host ""
     Write-Host "ERRO: $Message" -ForegroundColor Red
     Write-Host "O script foi interrompido." -ForegroundColor Red
     exit 1
 }
 
+# EXEMPLO: encerra processos (edite os nomes se precisar)
 function Stop-TargetProcesses {
-    # Coloque aqui os processos que VOCÊ quer encerrar
-    # Exemplo:
-    # Get-Process "meuprocesso" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-}
-
-function Get-TargetPath {
-    # Coloque aqui como VOCÊ detecta o caminho no registro/FS
-    # Retorne um caminho valido ou $null
-    return $null
+    $names = @("steam")  # <- troque/adicione nomes aqui se quiser
+    foreach ($n in $names) {
+        Get-Process $n -ErrorAction SilentlyContinue | ForEach-Object {
+            Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 function Download-FileClean {
@@ -117,38 +109,54 @@ function Expand-ArchiveClean {
 # EXECUCAO
 # ===============================================================
 
-# STEP 1 - DETECT
-$targetPath = Get-TargetPath
-if (-not $targetPath) { Stop-OnError "Caminho nao encontrado." }
+# STEP 1 - DETECT PATH (sem dar "Caminho nao encontrado")
+$targetPath = Read-Host "Digite o caminho da pasta de destino (ex: C:\MinhaPasta)"
+
+if (-not $targetPath) { Stop-OnError "Caminho vazio." }
+
+if (-not (Test-Path $targetPath)) {
+    $ans = Read-Host "A pasta nao existe. Quer criar? (S/N)"
+    if ($ans -match '^(s|S)$') {
+        New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
+    } else {
+        Stop-OnError "Caminho nao encontrado."
+    }
+}
+
 Next-Step
 
 # STEP 2 - STOP
 Stop-TargetProcesses
-Start-Sleep 1
+Start-Sleep -Milliseconds 400
 Next-Step
 
-# STEP 3 - DOWNLOAD (sem barra azul)
+# STEP 3 - DOWNLOAD (exemplo - coloque suas URLs se for usar)
 $tempZip = Join-Path $env:TEMP "payload.zip"
 
-# >>> COLE AQUI suas URLs (principal e fallback) e mantenha o OutFile $tempZip
-# Download-FileClean "URL_PRINCIPAL" "URL_FALLBACK" $tempZip
+# Descomente e coloque suas URLs se precisar:
+# Download-FileClean `
+#   "URL_PRINCIPAL_AQUI" `
+#   "URL_FALLBACK_AQUI" `
+#   $tempZip
 
+Start-Sleep -Milliseconds 400
 Next-Step
 
-# STEP 4 - EXTRACT (sem barra azul)
-# >>> COLE AQUI seu destino real (DestinationPath)
+# STEP 4 - EXTRACT (exemplo)
+# Descomente se voce tiver baixado um zip:
 # Expand-ArchiveClean -ZipPath $tempZip -DestinationPath $targetPath
-
 # Remove-Item $tempZip -Force -ErrorAction SilentlyContinue
+
+Start-Sleep -Milliseconds 400
 Next-Step
 
-# STEP 5 - CONFIG
-# >>> COLE AQUI sua criacao de config (sem mexer na UI)
+# STEP 5 - CONFIG (exemplo)
+# Coloque sua configuracao aqui, se tiver
+
+Start-Sleep -Milliseconds 400
 Next-Step
 
 # STEP 6 - FINAL
-# >>> COLE AQUI seu Start-Process (se houver)
 Next-Step
-
 Write-Host ""
 Write-Host "[OK] Processo concluido com sucesso!" -ForegroundColor Green
